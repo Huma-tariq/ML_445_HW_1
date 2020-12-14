@@ -1,0 +1,425 @@
+---
+title: "Evaluation of Machine learning algorithms for delineating Site-Specific Management Units"
+author: "Huma and Yilma"
+date: "12/14/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## Introduction     
+
+The whole concept of precision agriculture revolves around the idea of managing infield spatial and temporal variability to both enhance the yield returns and lower the environmental footprint caused by the excess application of resources. This issue becomes more crucial by the fact that agriculture is one of the major culprits causing human induced climate change. This sector contributes to about 13.5% of global greenhouse emissions. It is responsible for the production of 70% of nitrous oxide, 50% of methane and 25% of carbon dioxide emissions globally*^1*.This challenge also provides us with the opportunity.
+
+Different precision management strategies can be used to estimate variable rates of inputs for a particular field. One of those are  management zones of high, low, and medium productivity which are delineated by using bare-soil imagery, topography, and farmer’s knowledge as data layers, and then inputs are applied accordingly. Management zone can be defined as the subregion of the field with homogenous soil properties which allows us to apply single rate of any agricultural supplies in that subregion. 
+There are several methods discussed in literature for the delineation of Management zones*^2*. In this project we evaluated the performance of different Machine learning algorithms to delineate the management zones. 
+
+
+## Methodology      
+
+# Site description
+The experimental site is the field 3100 at Colorado State University’s Agricultural Research Development and Educational Center, in Fort Collins Colorado, USA. (40°40’ 38.24’’ N, 104° 58’ 44.76’’ W).     
+
+# Soil data 
+Soil sample for 84 points were collected and analyzed.     
+•	The 84 soil samples were interpolated, and 678 points were extracted from the spatial image in respective to each pixel of the  study area.    
+•	Soil parameter, like Nitrate-Nitrogen, Phosphorus-Olsen, Potassium, Calcium, Magnesium, Sodium, Sulfur, Copper, Iron, Manganese, Zinc Soil Ph, EC, and Soluble Salt are available for each 678 points.     
+
+# Vegetation indices      
+
+•	Vegetation indices calculated from multi-spectral imagery for the whole period of crop growing season, every 4 to 5 days (May to October 2020).
+•	Vegetation indices (SAVI, NDVI, OSAVI, and GNDVI) of 678 points are available in respective to each pixel of the study area.  
+
+# Electro-conductivity data    
+
+•	ECa shallow and deep depth data for 678 points     
+
+# DEM      
+
+•	Digital elevation modeling points for 678 points in respective to each pixel.     
+
+
+## Libraries used     
+
+Prior to start our analysis, we have uploaded raster, rgdal, pls, ggplot2 and ggfortify libraries for the purpose of successfully executing this specific r code.
+
+```{r}
+set.seed(445)
+Soil_data_WithoutG = read.csv("Data_4_machine learning_wzout_G.csv")
+head(Soil_data_WithoutG)
+str(Soil_data_WithoutG)
+#install.packages("rgdal")
+#install.packages ("raster")
+#install.packages("ggplot2")
+#install.packages("ggfortify")
+#install.packages ("autoplotly")
+library(rgdal)
+library(raster)
+library(ggplot2)
+library(ggfortify)
+library(autoplotly)
+```
+
+##  Principal component analysis     
+
+For this project two types of principal component analysis performed, the first PCA is without considering the spatial perspective of the data (normal data clustering) and the second clustering is with a perception that this data is spatial data and clustering need to take into account the spatial distribution of the data.        
+
+As we have used the variety of soil data including multiple predictors, hence, our first objective is to choose best predictors for the delineation of management zones from almost a dozen predictors. For that purpose, we have used Principal component analysis to compute principal components, by using “princomp” function in R statistical software on the scaled dataset. 
+
+
+```{r}
+#Principal component analysis 
+
+
+
+pca = prcomp(Soil_data_WithoutG, center = TRUE, scale = TRUE)
+pca = prcomp(Soil_data_WithoutG[], center = TRUE, scale = TRUE)
+
+
+summary(pca)
+plot(pca)
+plot(pca, type = 'l')
+
+biplot(pca)
+
+attributes(pca)
+
+#pca$sdev
+pca$rotation
+#pca$center
+#pca$scale
+#pca$x
+pca$prcomp
+
+
+#install.packages('ggplot2')
+#library(ggplot2)
+
+#ggplot(Soil_data_WithoutG, aes(PC1, PC2, col =))
+
+```
+
+
+
+```{r}
+Soil_data_WithG = read.csv("Data_4_machine learning_with_G.csv")
+
+head(Soil_data_WithG)
+str(Soil_data_WithG)
+colnames(Soil_data_WithG)
+
+
+Soil_data_WithG.scaled = scale(as.matrix(Soil_data_WithG[4:13]))
+
+#princomp performs a principal components analysis on the given numeric data matrix and returns the results as an object of class princomp 
+
+pca = princomp(Soil_data_WithG.scaled,cor=F,scores=T) # use covariance matrix to match the following...
+
+attributes(pca)
+pca$loadings
+biplot(pca)
+
+```
+
+
+## Study area    
+
+The PCA indicates what the individual weightings are for the predictors involved, however it does not consider the actual geography. For that purpose, we have imported the ESRI shape file of the experimental site. To be able to use the study area map for the later visualizations, we have defined a function the “backdrop ()” to bring up our study area map later in the analysis.  We have mapped the PC1 and PC2 by indicating the points greater than zero as yellow and less than zero as brown, respectively. 
+
+
+```{r}
+library(rgdal)
+Study_area= readOGR("Study_area.shp")
+
+#crs(Study_area)    
+
+plot(Study_area, asp=1,type='l',xaxt='n',yaxt='n',xlab='',ylab='',bty='n',col='grey')
+
+backdrop = function() 
+  
+plot(Study_area,asp=1,type='l',xaxt='n',yaxt='n',xlab='',ylab='',bty='n',col='grey')
+
+pc1 = pca$scores[,1]
+backdrop()
+points(Soil_data_WithG$POINT_X[pc1>0],Soil_data_WithG$POINT_Y[pc1>0],pch=16,col='yellow')
+points(Soil_data_WithG$POINT_X[pc1<0],Soil_data_WithG$POINT_Y[pc1<0],pch=16,col='brown')
+
+
+pc2 = pca$scores[,2]
+backdrop()
+points(Soil_data_WithG$POINT_X[pc2>0],Soil_data_WithG$POINT_Y[pc2>0],pch=16,col='yellow')
+points(Soil_data_WithG$POINT_X[pc2<0],Soil_data_WithG$POINT_Y[pc2<0],pch=16,col='brown')
+
+```
+
+
+# Discussion on PCA output:     
+
+Summary output is giving us three values for each principal component including Standard deviation along specific PC, proportion of variation of the original data explained by each PC and cumulative proportion of variation explained by PCs. 
+It indicates that PC1 and PC2 are representatives of most variability (~72%) present in the data set. As shown below in the PCA plot, it shows PC1 and PC2 on X and Y axis, respectively. The plot in general reveals the overall pattern of the data with respect to respective axes.  For instance, PC1 seems to have placed equal weight on PH and silt while PC2 placing same weight on clay, potassium and Phosphorous.    
+
+Output figures indicating a spatial trend of PC1 and PC2 respectively.     
+
+
+
+## K-means clustering based on soil and vegetation indices (satellite imagery based)      
+
+K-means clustering is one of most commonly used unsupervised learning for a successful grouping according to numerous researches^*3,4*. Delineating site–specific management zone is one of the proven technique, accepted worldwide to practice a precision agriculture for a spatially variable field^*2*.    
+Pre-season and in-season management zone required to understand the soil and crop status variability, respectively. This project used k-means clustering algorithms to represent zonal clustering on homogeneity of soil properties and bare soil indices^*5*. 
+Two k-mean clustering performed, the first clustering is with combination of all the soil data and the second clustering is with a combination of bare NDVI, SAVI, OSAVI and GNDVI. Both clustering considered spatial characteristics of the data and clustering was conducted with perspective of the spatial distribution of the data.     
+All the data for both clustering are quantitative, a total of 678 observation and 9 variables used for the clustering based on soil information. Data indexed from column 4 to 13 specifically and used as data input for executing the k-means function in r. For vegetation indices-based clustering, a combination of 4 vegetation indices used.      
+The vegetation indices-based clustering is assumed for in-season period even if this specific data were at the beginning of the season. K-means cluster with k-means function method used for both cases to perform soil fertility status grouping.  We have determined the number of clusters to be 3 based on the assumption that we will have three soil fertility status (poor, medium and good). For vegetation indices-based clustering, we have used vegetation as indicative of variability of soil properties to form cluster using k-means function and Lloyd method.    
+Lloyd algorithm with maximum iteration of 500 used to do clustering for both cases. Lloyd uses the selected k data points as center, assign the data to closest center each time and update cluster during each iteration.      
+
+
+```{r}
+#k-means clustering based on sOil data
+
+#Data
+Data_4_Kmeans = read.csv("Data_4_machine learning_with_G.csv")
+
+#View(Data_4_Kmeans)
+
+#Prepare Data
+K_means_cluster  = kmeans(Data_4_Kmeans[,4:13], centers = 3, iter.max = 500, nstart = 3, algorithm="Lloyd")
+
+attributes(K_means_cluster)
+str(K_means_cluster)
+cluster_4_plot = K_means_cluster$cluster
+
+#Study area
+Study_area = readOGR("Study_area.shp")
+
+#crs(Study_area)
+
+#plot
+plot(Study_area, asp=1,type='l',xaxt='n',yaxt='n',xlab='',ylab='',bty='n',col='grey')
+backdrop_1 = function() 
+plot(Study_area, asp=1,type='l',xaxt='n',yaxt='n',xlab='',ylab='',bty='n',col='grey')
+
+points(Data_4_Kmeans$POINT_X[cluster_4_plot==1], Data_4_Kmeans$POINT_Y[cluster_4_plot==1], pch=16, col='green')
+points(Data_4_Kmeans$POINT_X[cluster_4_plot==2], Data_4_Kmeans$POINT_Y[cluster_4_plot==2], pch=16, col='blue')
+points(Data_4_Kmeans$POINT_X[cluster_4_plot==3], Data_4_Kmeans$POINT_Y[cluster_4_plot==3], pch=16, col='red')
+
+library(autoplotly)
+library(ggplot2)
+autoplot(K_means_cluster, Data_4_Kmeans[,4:13], frame=TRUE)
+```
+
+# Soil data based k-means clustering results      
+
+We have performed the k-means clustering for both cases. The output indicates that k-means clustering has performed well during both conditions and the geographically weighted vegetation indices cluster map were able to be compared to vegetation indices map, which is based on satellite data. As show in the above figures, these clusters look distinct and without any overlapping, we can conclude that the clustering analysis was successfully executed. 
+
+
+
+```{r}
+#k-means clustering based on NDVI data
+
+#Data
+NDVI_Data_4_Kmeans = read.csv("Data_4_machine learning_bare_NDVI_SAVI.csv")
+
+#Prepare Data
+NDVI_K_means_cluster = kmeans(NDVI_Data_4_Kmeans[,4:7], centers = 3, iter.max = 500, nstart = 3, algorithm="Lloyd")
+
+attributes(NDVI_K_means_cluster)
+str(NDVI_K_means_cluster)
+cluster_4_NDVI_plot = NDVI_K_means_cluster$cluster
+
+#Study area
+Study_area = readOGR("Study_area.shp")
+
+#crs(Study_area)
+
+#plot
+plot(Study_area, asp=1,type='l',xaxt='n',yaxt='n',xlab='',ylab='',bty='n',col='grey')
+backdrop_1 = function() 
+plot(Study_area, asp=1,type='l',xaxt='n',yaxt='n',xlab='',ylab='',bty='n',col='grey')
+
+points(NDVI_Data_4_Kmeans$POINT_X[cluster_4_NDVI_plot==1], NDVI_Data_4_Kmeans$POINT_Y[cluster_4_NDVI_plot==1], pch=16, col='green')
+points(NDVI_Data_4_Kmeans$POINT_X[cluster_4_NDVI_plot==2], NDVI_Data_4_Kmeans$POINT_Y[cluster_4_NDVI_plot==2], pch=16, col='blue')
+points(NDVI_Data_4_Kmeans$POINT_X[cluster_4_NDVI_plot==3], NDVI_Data_4_Kmeans$POINT_Y[cluster_4_NDVI_plot==3], pch=16, col='red')
+
+autoplot(NDVI_K_means_cluster, NDVI_Data_4_Kmeans[,4:7], frame=TRUE)
+```
+
+# Vegetation indices based k-means clustering results    
+
+Vegetation indices based in-season clustering looks distinct and perfectly clustered. As shown in figures above, the spatial distribution comparison between k-means clustered vegetation indices and NDVI look similar. Specifically, at the northern part of the field, on both maps it clearly shows that there is a different kind of vegetation covers, which on ground is true.
+
+
+## Nitrogen and organic matter prediction  prediction          
+
+Predicting nitrogen and organic matter with reflectance data as a predictor is common and numerous studies successfully predicted soil nutrient and crop nutrient status mainly from hyperspectral information^*6*.
+For this project, only partial least square regression (PSLR) method used to predict nitrogen and organic matter and assess how well it perform compared to the observed variable.
+A model is developed to be help us predict nitrogen and organic matter separately from using combination of multi-spectral based vegetation indices, electro-conductivity data and digital elevation model. For training the PSLR model, the data was divided the full data into training and test to train and test the model respectively. Scaling of the dataset were applied and cross validation was used as a validation approach.      
+
+
+
+```{r}
+set.seed(445)
+#Nitrogen prediction based on ECa and VI based
+N_prediction = read.csv("Data_4_machine learning_PLSR.csv")
+str(N_prediction)
+N_lm = lm(Nitrate_N ~ Eca_deep + Eca_shallow + Bare_SAVI + Bare_NDVI + DEM , data = N_prediction)
+summary(N_lm)
+
+summary(N_prediction)
+#Many of these predictors are significant
+#The r square is 0.7291 for all 5 regresses
+
+#plot the fitted variables against their response variables >> #To check the scatter and if it's noisy.
+
+plot(N_lm$fitted.values ~ N_prediction$Nitrate_N, main = "fitted vs response")
+library (pls)
+
+#partial least square
+#N_plsr = plsr(Nitrate_N ~ Eca_deep + Eca_shallow + Bare_SAVI + Bare_NDVI + DEM , #data = N_prediction, scale = TRUE, validation = "CV")
+#validation procedure - standard cross validation
+#summary(N_plsr)
+#shows us the percentage variance explained in our Nitrate N
+#plsr mapping a linear combination of x variables and use that to optimize predicting against y variable (N_nitrate)
+#plot(RMSEP(N_plsr))
+
+
+#subsetting
+#training and test data
+#Split the data into training (60%) and “test” (40%) set randomly.
+
+plsr_data_OM = sample(nrow(N_prediction), nrow(N_prediction)*.6)
+plsr_training = N_prediction[plsr_data_OM,]
+plsr_test = N_prediction[-plsr_data_OM,]
+
+#number of component chosen is 5
+#training
+N_plsr_training = plsr(Nitrate_N ~ Eca_deep + Eca_shallow + Bare_SAVI + Bare_NDVI + DEM , data = plsr_training, scale = TRUE)
+
+#validation procedure - standard cross validation
+summary(N_plsr_training)
+
+validationplot(N_plsr_training, val.type = "MSEP")
+
+#test >>> predict
+plsr_test$plsr_N_fitted = predict(N_plsr_training, newdata=plsr_test, ncomp= 4)
+
+average_test = mean(plsr_test$Nitrate_N)
+
+1-mean((plsr_test$plsr_N_fitted- plsr_test$Nitrate_N)^2)/mean((average_test - plsr_test$Nitrate_N)^2)
+
+ggplot()+
+  geom_line(data = plsr_test, aes(y=plsr_N_fitted, x=OBJECTID_1, colour = "red"), size =1) +
+  geom_line(data = plsr_test, aes(y=Nitrate_N, x=OBJECTID_1,  colour="blue"), size =1) +
+  xlab("Observations")+
+  ylab("Soil Nitrogen")+
+  scale_color_discrete(name = "Soil nitrogen", labels=c("Observed nitrogen", "Predicted nitrogen"))
+
+```
+
+  
+  
+    
+
+```{r}
+set.seed(445)
+#OM prediction based on ECa and VI based
+OM_prediction = read.csv("Data_4_machine learning_PLSR.csv")
+str(OM_prediction)
+OM_lm = lm(OM ~ Eca_deep + Eca_shallow + Bare_SAVI + Bare_NDVI + DEM , data = OM_prediction)
+summary(OM_lm)
+
+summary(OM_prediction)
+#Many of these predictors are significant
+#The r square is 0.7291 for all 5 regresses
+
+#plot the fitted variables against their response variables >> #To check the scatter and if it's noisy.
+
+plot(OM_lm$fitted.values ~ OM_prediction$OM, main = "fitted vs response")
+library (pls)
+
+#partial least square
+#OM_plsr = plsr(OM ~ Eca_deep + Eca_shallow + Bare_SAVI + Bare_NDVI + DEM , data = #OM_prediction, scale = TRUE, ncomp =5, validation = "CV")
+#validation procedure - standard cross validation
+#summary(OM_plsr)
+#shows us the percentage variance explained in our Nitrate N
+#plsr mapping a linear combination of x variables and use that to optimize predicting against y variable (N_nitrate)
+#plot(RMSEP(OM_plsr))
+
+
+
+#subsetting
+#training and test data
+#Split the data into training (60%) and “test” (40%) set randomly.
+
+plsr_data_OM= sample(nrow(OM_prediction), nrow(OM_prediction)*.6)
+plsr_training_OM_data = OM_prediction[plsr_data_OM,]
+plsr_test_OM_data = OM_prediction[-plsr_data_OM,]
+
+#number of component chosen is 5
+#training
+OM_plsr_training = plsr(OM ~ Eca_deep + Eca_shallow + Bare_SAVI + Bare_NDVI + DEM , data = plsr_training_OM_data, scale = TRUE)
+
+#validation procedure - standard cross validation
+summary(OM_plsr_training)
+
+validationplot(OM_plsr_training, val.type = "MSEP")
+
+#test >>> predict
+plsr_test_OM_data$plsr_OM_fitted = predict(OM_plsr_training, newdata=plsr_test_OM_data, ncomp= 4)
+
+average_test = mean(plsr_test_OM_data$OM)
+
+1- mean((plsr_test_OM_data$plsr_OM_fitted - plsr_test_OM_data$OM)^2)/mean((average_test - plsr_test_OM_data$OM)^2)
+
+
+
+ggplot()+
+  geom_line(data = plsr_test_OM_data, aes(y=plsr_OM_fitted, x=OBJECTID_1, colour = "red"), size =1) +
+  geom_line(data = plsr_test_OM_data, aes(y=OM, x=OBJECTID_1,  colour="blue"), size =1) +
+  xlab("Observations")+
+  ylab("Organic matter")+
+  scale_color_discrete(name = "Organic matter", labels=c("Observed OM", "Predicted OM"))
+```
+
+## Nitrogen and organic matter prediction results     
+
+1.	A linear regression was done to understand the data from a linear perspective for both nitrogen and OM as a response variable.
+2.	The multiple r-square of the linear regression are 0.729 and 0.5268 respectively for nitrogen and OM.
+3.	Nitrogen was 71.51% accurately predicted, nitrogen prediction shows that the trend between observed and predicted nitrogen is promising.
+4.	Organic matter was 48.01% accurately predicted, based on the visual assessment of Organic matter prediction figure, the trend between observed and predicted organic matter is not promising.
+5.	It’s possible to conclude that PLSR worked better for nitrogen prediction than organic matter based on combination of vegetation indices (NDVI and SAVI), electro-conductivity data and elevation information.
+
+
+## References:   
+
+1. 	Montzka SA, Dlugokencky EJ, Butler JH. Non-CO 2 greenhouse gases and. Nature. Published online 2011:0-7. doi:10.1038/nature10322
+2. 	Nawar S, Corstanje R, Halcro G, Mulla D, Mouazen AM. Delineation of Soil Management Zones for Variable-Rate Fertilization: A Review. Vol 143. 1st ed. Elsevier Inc.; 2017. doi:10.1016/bs.agron.2017.01.003
+3. 	Galambošová J, Rataj V, Prokeinová R, Prešinská J. Determining the management zones with hierarchic and non-hierarchic clustering methods. Res Agric Eng. 2014;60(2000):S44-S51. doi:10.17221/34/2013-rae
+4. 	Saifuzzamna M, Adamchuk V, Huang H, Ji W. Data Clustering Tools for Understanding Spatial Heterogeneity in Crop Production by Integrating Proximal Soil Sensing and Remote Sensing Data. Int Conf Precis Agric. Published online 2018:1-14.
+5. 	Gavioli A, de Souza EG, Bazzi CL, Schenatto K, Betzek NM. Identification of management zones in precision agriculture: An evaluation of alternative cluster analysis methods. Biosyst Eng. 2019;181:86-102. doi:10.1016/j.biosystemseng.2019.02.019
+6. 	Gmur S, Vogt D, Zabowski D, Monika Moskal L. Hyperspectral analysis of soil nitrogen, carbon, carbonate, and organic matter using regression trees. Sensors (Switzerland). 2012;12(8):10639-10658. doi:10.3390/s120810639
+
+## Code concept support from the following site:   
+
+https://rpubs.com/chrisbrunsdon/99675
+
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
